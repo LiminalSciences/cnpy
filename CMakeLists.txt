@@ -9,19 +9,21 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 option(ENABLE_STATIC "Build static (.a) library" ON)
 
-find_package(ZLIB REQUIRED)
-
-include_directories(${ZLIB_INCLUDE_DIRS})
-
 add_library(cnpy SHARED "cnpy.cpp")
 # create alias with exported name for including via find_package or FetchContent
 add_library(Cnpy::Cnpy ALIAS cnpy)
+
 target_include_directories(cnpy
     PUBLIC
       $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 )
-target_link_libraries(cnpy ${ZLIB_LIBRARIES})
+if(NOT IOS)
+  find_package(ZLIB REQUIRED)
+  target_link_libraries(cnpy ZLIB::ZLIB)
+else()
+  target_link_libraries(cnpy "-lz")
+endif()
 
 include(GNUInstallDirs)
 
@@ -31,25 +33,28 @@ install(TARGETS cnpy
     PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 )
 
-#This is required so that the exported target has the name JSONUtils and not jsonutils
+#This is required so that the exported target has the name Cnpy and not cnpy
 set_target_properties(cnpy PROPERTIES EXPORT_NAME Cnpy)
 
 if(ENABLE_STATIC)
-    add_library(cnpy-static STATIC "cnpy.cpp")
-    set_target_properties(cnpy-static PROPERTIES OUTPUT_NAME "cnpy")
-    install(TARGETS "cnpy-static"
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-)
+  add_library(cnpy-static STATIC "cnpy.cpp")
+  set_target_properties(cnpy-static PROPERTIES OUTPUT_NAME "cnpy")
+  install(TARGETS "cnpy-static"
+      ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  )
 endif(ENABLE_STATIC)
 
 install(FILES "cnpy.h" DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-install(FILES "mat2npz" "npy2mat" "npz2mat"
-    DESTINATION bin
-    PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-)
 
-add_executable(example1 example1.cpp)
-target_link_libraries(example1 cnpy)
+if (NOT IOS)
+  # don't install extra utils under iOS
+  install(FILES "mat2npz" "npy2mat" "npz2mat"
+      DESTINATION bin
+      PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+  )
+  add_executable(example1 example1.cpp)
+  target_link_libraries(example1 cnpy)
+endif()
 
 install(EXPORT cnpy-targets
   FILE
